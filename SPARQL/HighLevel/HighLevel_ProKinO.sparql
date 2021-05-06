@@ -1,0 +1,182 @@
+PREFIX prokino: <http://om.cs.uga.edu/prokino/2.0/#>
+PREFIX prokino.rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX pro.rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX nextprot: <http://nextprot.org/rdf#>
+PREFIX mgi: <http://bio2rdf.org/mgi_vocabulary:>
+PREFIX mgi.go: <http://bio2rdf.org/goa_vocabulary:>
+PREFIX mgi.affy: <http://bio2rdf.org/affymetrix_vocabulary:>
+
+SELECT DISTINCT
+	STR(?genename) AS ?Gene
+	STR(?uniprotid) AS ?UniProt_ID
+	STR(?mutationcount) AS ?Mutation_Count
+	STR(?reactioncount) AS ?Reaction_Count
+	STR(?complexcount) AS ?Complex_Count
+	STR(?pathwaycount) AS ?Pathway_Count
+	STR(?pubmedcount) AS ?PubMed_Count
+WHERE
+{
+	SERVICE <http://vulcan.cs.uga.edu/sparql>
+	{
+		SELECT DISTINCT
+			?genename
+			?uniprotid
+			?mutationcount
+			?reactioncount
+			?complexcount
+			?pathwaycount
+			?pubmedcount
+		WHERE
+		{
+			#All Protein List
+			{
+				SELECT DISTINCT
+					?genename
+					?uniprotid
+				WHERE
+				{
+					?gene prokino.rdf:type prokino:Gene .
+					?gene prokino:presentIn prokino:Human .
+					?gene prokino:hasPrimaryName ?genename .
+					?gene prokino:hasDbXref ?protid .
+					
+					?protid prokino:isPrimaryUniprotId ?isprimaryuniprotid .
+					?protid prokino:hasIdentifier ?uniprotid .
+					FILTER REGEX(?isprimaryuniprotid,"true")
+				}
+			}
+			#ProKinO: Mutation Count
+			OPTIONAL
+			{
+				SELECT DISTINCT
+					?genename
+					COUNT(*) AS ?mutationcount
+				WHERE
+				{
+					SELECT DISTINCT
+						?genename
+						?mutation
+						?sample
+					WHERE
+					{
+						?gene prokino.rdf:type prokino:Gene .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:presentIn prokino:Human .
+						?gene prokino:hasMutation ?mutation .
+						
+						?mutation prokino:inSample ?sample .
+					}
+				}
+				GROUP BY ?genename
+			}
+			#ProKinO: Reaction Count
+			OPTIONAL
+			{
+				SELECT DISTINCT
+					?genename
+					COUNT(*) AS ?reactioncount
+				WHERE
+				{
+					SELECT DISTINCT
+						?genename
+						?reactionname
+					WHERE
+					{
+						?gene prokino.rdf:type prokino:Gene .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:presentIn prokino:Human .
+						
+						?container prokino:includes* ?gene .
+						{
+							{
+								?reaction prokino:consumes ?container .
+							}
+							UNION
+							{
+								?reaction prokino:produces ?container .
+							}
+							UNION
+							{
+								?reaction prokino:hasCatalyst ?container .
+							}
+						}
+						
+						?reaction prokino.rdf:type prokino:Reaction .
+						?reaction prokino:hasPrimaryName ?reactionname .
+					}
+				}
+				GROUP BY ?genename
+			}
+			#ProKinO: Complex Count
+			OPTIONAL
+			{
+				SELECT DISTINCT
+					?genename
+					COUNT(*) AS ?complexcount
+				WHERE
+				{
+					SELECT DISTINCT
+						?genename
+						?complexname
+					WHERE
+					{
+						?gene prokino.rdf:type prokino:Gene .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:presentIn prokino:Human .
+						
+						?complex prokino:includes ?gene .
+						?complex prokino.rdf:type prokino:Complex .
+						?complex prokino:hasPrimaryName ?complexname .
+					}
+				}
+				GROUP BY ?genename
+			}
+			#ProKinO: Pathway Count
+			OPTIONAL
+			{
+				SELECT DISTINCT
+					?genename
+					COUNT(*) AS ?pathwaycount
+				WHERE
+				{
+					SELECT DISTINCT
+						?genename
+						?pathwayname
+					WHERE
+					{
+						?gene prokino.rdf:type prokino:Gene .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:presentIn prokino:Human .
+						
+						?gene prokino:participatesIn ?pathway .
+						?pathway prokino:hasPrimaryName ?pathwayname . 
+					}
+				}
+				GROUP BY ?genename
+			}
+			#ProKinO: PubMed Count
+			OPTIONAL
+			{
+				SELECT DISTINCT
+					?genename
+					COUNT(*) AS ?pubmedcount
+				WHERE
+				{
+					SELECT DISTINCT
+						?genename
+						?pubmedid
+					WHERE
+					{
+						?gene prokino.rdf:type prokino:Gene .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:presentIn prokino:Human .
+						?gene prokino:hasDbXref ?pubmedid .
+						FILTER REGEX(?pubmedid,"PubMed-")
+					}
+				}
+				GROUP BY ?genename
+			}
+		}
+	}
+}
+ORDER BY ?genename

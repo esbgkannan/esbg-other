@@ -1,0 +1,75 @@
+PREFIX prokino: <http://om.cs.uga.edu/prokino/2.0/#>
+PREFIX prokino.rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX pro.rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX nextprot: <http://nextprot.org/rdf#>
+PREFIX mgi: <http://bio2rdf.org/mgi_vocabulary:>
+PREFIX mgi.go: <http://bio2rdf.org/goa_vocabulary:>
+PREFIX mgi.affy: <http://bio2rdf.org/affymetrix_vocabulary:>
+
+SELECT DISTINCT
+	STR(?genename) AS ?Gene
+	STR(?uniprotid) AS ?Mouse_UniProt_ID
+	STRAFTER(STR(?mgi_gene),"/bio2rdf.org/") AS ?MGI_ID
+	#STR(?gocount) AS ?Mouse_GO_Count
+	STR(?phenotypecount) AS ?Mouse_Phenotype_Count
+	#STR(?expressioncount) AS ?Mouse_Expression_Count
+	#STR(?pubmedcount) AS ?Mouse_Pubmed_Count
+WHERE
+{
+	SERVICE <http://bio2rdf.org/sparql>
+	{
+		#Get Mouse UniProtID
+		{
+			SELECT DISTINCT
+				?genename
+				?uniprotid
+				STR(?mgi_uniprot) AS ?mgi_uniprotid
+			WHERE
+			{
+				SERVICE <http://vulcan.cs.uga.edu/sparql>
+				{
+					SELECT DISTINCT
+						?genename
+						?uniprotid
+						CONCAT("http://bio2rdf.org/uniprot:",STR(?uniprotid)) AS ?mgi_uniprot
+					WHERE
+					{
+						?gene rdf:type prokino:Gene .
+						?gene prokino:presentIn prokino:Mouse .
+						?gene prokino:hasPrimaryName ?genename .
+						?gene prokino:hasDbXref ?protid .
+						
+						?protid prokino:isPrimaryUniprotId ?isprimaryuniprotid .
+						?protid prokino:hasIdentifier ?uniprotid .
+						FILTER REGEX(?isprimaryuniprotid,"true")
+					}
+				}
+			}
+		}
+		#MGI: et MGI ID & Phenotype Count
+		OPTIONAL
+		{
+			SELECT DISTINCT
+				?mgi_gene
+				STR(?mgi_uniprot) AS ?mgi_uniprotid
+				COUNT(*) AS ?phenotypecount
+			WHERE
+			{
+				SELECT DISTINCT
+					?mgi_gene
+					?mgi_uniprot
+					?phenotypes
+				WHERE
+				{
+					?mgi_gene a mgi:Gene .
+					?mgi_gene mgi:x-uniprot ?mgi_uniprot .
+					?mgi_model mgi:marker ?mgi_gene .
+					?mgi_gene mgi:x-uniprot ?mgi_uniprot .
+					?mgi_model mgi:phenotype ?phenotypes .
+				}
+			}
+			GROUP BY ?mgi_gene ?mgi_uniprot
+		}
+	}
+}
+ORDER BY ?genename

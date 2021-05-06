@@ -1,0 +1,56 @@
+PREFIX prokino: <http://om.cs.uga.edu/prokino/2.0/#>
+PREFIX prokino.rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX pro.rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX nextprot: <http://nextprot.org/rdf#>
+PREFIX mgi: <http://bio2rdf.org/mgi_vocabulary:>
+PREFIX mgi.go: <http://bio2rdf.org/goa_vocabulary:>
+PREFIX mgi.affy: <http://bio2rdf.org/affymetrix_vocabulary:>
+
+SELECT DISTINCT
+	STR(?genename) AS ?Gene
+	STR(?uniprotid) AS ?UniProt_ID
+	STR(?nextprot_entry) AS ?neXtProt_ID
+	#STR(?expression_count) AS ?Expression_Count
+	#STR(?go_count) AS ?GO_Count
+	STR(?ppi_count) AS ?PPI_Count
+WHERE
+{
+	SERVICE <https://api.nextprot.org/sparql>
+	{
+		SELECT DISTINCT
+			?genename
+			?uniprotid
+			?nextprot_entry
+			#?expression_count
+			#?go_count
+			?ppi_count
+		WHERE
+		{
+			SELECT DISTINCT
+				STR(?name) AS ?genename
+				STRAFTER(STR(?entry),"/entry/NX_") AS ?uniprotid
+				STRAFTER(STR(?entry),"/entry/") AS ?nextprot_entry
+				COUNT(*) AS ?ppi_count
+			WHERE
+			{
+				SELECT DISTINCT
+					?name
+					?entry
+					?interaction
+				WHERE
+				{
+					?entry nextprot:isoform ?iso .
+					?entry nextprot:gene ?gene .
+					?gene nextprot:name ?name.
+					
+					?iso nextprot:binaryInteraction ?interaction .
+					?interaction nextprot:interactant ?interactant .
+					?interaction nextprot:quality nextprot:GOLD .
+					?interactant a nextprot:Entry .
+				}
+			}
+			GROUP BY ?name ?entry
+		}
+	}
+}
+ORDER BY ?Protein
